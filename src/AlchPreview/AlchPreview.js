@@ -17,12 +17,19 @@ import './AlchPreview.css';
 //Sort in descending order from highest diff of alch value - sell value
 //For now just return the #1 item, eventually list like top 10
 
+let headers = new Headers({
+  "Accept"       : "application/json",
+  "Content-Type" : "application/json",
+  "User-Agent"   : "@MaldIncoming"
+});
+
 function Item_GE() {
   var id = 0;
   var value_high = 0;
   var value_low = 0;
   var value_avg = 0;
   var high_alch = 0;
+  var trade_limit = 0;
 }
 
 var runeNature = null;
@@ -53,66 +60,74 @@ export default function AlchPreview() {
   function handleClick() {
     initItems();
 
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', 'https://prices.runescape.wiki/api/v1/osrs/latest'); //Pull latest OSRS Grand Exchange data
-    xhr.onload = function() {
-      if (xhr.status === 200) { //If item data found, set the data, itemID, name, icon, and any other info
-        setData(JSON.parse(xhr.responseText));
-        
-        if (data_GE != null) {
-          //First get the GE value of nature runes since 1 is used per alch
-          setRuneNature(getDatabaseItemByID(561));
-          if (runeNature != null) {
-            console.log("Nats: " + JSON.stringify(runeNature));
-            setItemInfo(561);
-          }
+    fetch('https://prices.runescape.wiki/api/v1/osrs/latest', {
+      method: "GET",
+      headers: {
+        "Alching-Today-portfolio": headers
+      },
+    })
+  .then(response => response.json())
+  .then(data => setData(data))
+  .then(PopulateInfo())
+  .catch(error => console.error(error));
 
-          //Next arrange ALL GE items from highest value to lowest
-          //DO NOT sort the data_GE.data, this will assign new IDs that are incorrect
+  console.log(data_GE);
+}
 
-          var data_GE_Array = [];
-          for (var i in data_GE.data) {
-            //TODO:
-            //DO NOT just push existing data, indexes = item IDs so sorting it will throw everything out of whack
-            //Just create a new GE object and push it
-           // data_Array.push(data_GE.data[i]);
-
-
-           var itemInfo = new Item_GE();
-           itemInfo.id = i; //Note that GE item list is in item ID order
-           itemInfo.value_high = data_GE.data[i].high;
-           itemInfo.value_low = data_GE.data[i].low;
-           itemInfo.value_avg = Math.floor((data_GE.data[i].high + data_GE.data[i].low) / 2);
-           var test = getDatabaseItemByID(i);
-           if (test != null) { //Note that some of these results can be null
-            itemInfo.high_alch = test.highalch;
-           }
-           data_GE_Array.push(itemInfo);
-          }
-
-          //data_GE_Array.sort((b, a) => a.high_alch - b.high_alch); //Sort by high alch values
-          data_GE_Array.sort((b, a) => (a.high_alch - a.value_avg) - (b.high_alch - b.value_avg)); //Sort by alch minus avg GE value
-
-          //console.log(data_Array);
-          //setData(data_Array.sort((b, a) => a.high - b.high));
-
-          console.log("SORTED: " + JSON.stringify(data_GE_Array));
-        }
-
+  function PopulateInfo() {
+    if (data_GE != null) {
+      //First get the GE value of nature runes since 1 is used per alch
+      setRuneNature(getDatabaseItemByID(561));
+      if (runeNature != null) {
+        console.log("Nats: " + JSON.stringify(runeNature));
+        setItemInfo(561);
       }
-    };
-    xhr.send();
+
+      //Next arrange ALL GE items from highest value to lowest
+      //DO NOT sort the data_GE.data, this will assign new IDs that are incorrect
+
+      var data_GE_Array = [];
+      for (var i in data_GE.data) {
+        //TODO:
+        //DO NOT just push existing data, indexes = item IDs so sorting it will throw everything out of whack
+        //Just create a new GE object and push it
+       // data_Array.push(data_GE.data[i]);
+
+
+       var itemInfo = new Item_GE();
+       itemInfo.id = i; //Note that GE item list is in item ID order
+       itemInfo.value_high = data_GE.data[i].high;
+       itemInfo.value_low = data_GE.data[i].low;
+       itemInfo.value_avg = Math.floor((data_GE.data[i].high + data_GE.data[i].low) / 2);
+       var test = getDatabaseItemByID(i);
+       if (test != null) { //Note that some of these results can be null
+        itemInfo.high_alch = test.highalch;
+        itemInfo.trade_limit = test.limit;
+       }
+       data_GE_Array.push(itemInfo);
+      }
+
+      //data_GE_Array.sort((b, a) => a.high_alch - b.high_alch); //Sort by high alch values
+      data_GE_Array.sort((b, a) => (a.high_alch - a.value_avg) - (b.high_alch - b.value_avg)); //Sort by alch minus avg GE value
+
+      //console.log(data_Array);
+      //setData(data_Array.sort((b, a) => a.high - b.high));
+
+      console.log("SORTED: " + JSON.stringify(data_GE_Array));
+    }
   }
 
   function initItems() {
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', 'https://prices.runescape.wiki/api/v1/osrs/mapping');
-    xhr.onload = function() {
-      if (xhr.status === 200) {
-        setAllItems(JSON.parse(xhr.responseText));
-      }
-    };
-    xhr.send();
+
+    fetch('https://prices.runescape.wiki/api/v1/osrs/mapping', {
+      method: "GET",
+      headers: {
+        "Alching-Today-portfolio": headers
+      },
+    })
+    .then(response => response.json())
+    .then(data => setAllItems(data))
+    .catch(error => console.error(error));
   }
 
   function setItemInfo(id) { //Determine the item name, icon, associated info
